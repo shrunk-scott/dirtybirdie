@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f8f8fa">
+<title>Golf Prices</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#f2f2f7; --card:#ffffff; --sep:rgba(60,60,67,.20); --sep-soft:rgba(60,60,67,.10);
+    --label:#1c1c1e; --label2:rgba(60,60,67,.6); --label3:rgba(60,60,67,.3);
+    --fill:rgba(118,118,128,.12); --fill-strong:rgba(118,118,128,.2);
+    --navy:#1F3A5F; --teal:#0D7F7F; --teal-2:#2A9D8F; --tint:#e3f3f0;
+    --chev:#c4c4c6; --amber:#b56a1f;
+    --nav:rgba(248,248,250,.82);
+    --sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",system-ui,sans-serif;
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-bot:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--label);font-family:var(--sys);
+       font-size:17px;line-height:1.4;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+
+  .nav{position:sticky;top:0;z-index:20;background:var(--nav);
+       backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+       border-bottom:.5px solid var(--sep);padding:calc(var(--safe-top) + 8px) 16px 10px}
+  .wrap{max-width:760px;margin:0 auto}
+  .title{font-size:30px;font-weight:700;letter-spacing:.37px;margin:2px 0 12px;color:var(--label)}
+
+  .seg{display:flex;background:var(--fill);border-radius:9px;padding:2px;gap:2px;margin-bottom:10px}
+  .seg button{flex:1;appearance:none;border:0;background:transparent;border-radius:7px;
+       font:600 14px var(--sys);color:var(--label);padding:7px 10px;cursor:pointer;transition:background .2s,box-shadow .2s}
+  .seg button[aria-pressed="true"]{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12),0 1px 1px rgba(0,0,0,.04)}
+  .seg button:disabled{color:var(--label3)}
+  .seg button:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
+
+  .search{position:relative;margin-bottom:8px}
+  .search input{width:100%;height:38px;border:0;border-radius:10px;background:var(--fill);
+       font:17px var(--sys);color:var(--label);padding:0 12px 0 34px;
+       background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='rgba(60,60,67,.6)' stroke-width='2.2'><circle cx='11' cy='11' r='7'/><path d='M21 21l-4.3-4.3'/></svg>");
+       background-repeat:no-repeat;background-position:11px center}
+  .search input::placeholder{color:var(--label2)}
+  .search input:focus{outline:2px solid var(--teal);outline-offset:0}
+
+  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;-ms-overflow-style:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;appearance:none;border:0;background:var(--fill);color:var(--label);
+        border-radius:999px;padding:7px 14px;font:600 14px var(--sys);cursor:pointer;white-space:nowrap}
+  .chip[aria-pressed="true"]{background:var(--teal);color:#fff}
+  .chip:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
+
+  .bar{max-width:760px;margin:0 auto;padding:10px 16px 4px;display:flex;align-items:center;gap:12px;justify-content:space-between}
+  .count{font-size:13px;color:var(--label2);text-transform:uppercase;letter-spacing:.04em}
+  .sort{display:flex;align-items:center;gap:6px}
+  .sort label{font-size:13px;color:var(--label2)}
+  .sort select{appearance:none;border:0;background:var(--fill);border-radius:8px;color:var(--teal);
+        font:600 14px var(--sys);padding:6px 26px 6px 10px;cursor:pointer;
+        background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%230D7F7F' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
+        background-repeat:no-repeat;background-position:right 8px center}
+  .sort select:focus-visible{outline:2px solid var(--teal)}
+  .ctrls{display:flex;gap:14px;align-items:center}
+
+  main{max-width:760px;margin:0 auto;padding:6px 16px calc(var(--safe-bot) + 40px)}
+
+  .list{background:var(--card);border-radius:12px;overflow:hidden;box-shadow:0 0 0 .5px var(--sep-soft)}
+  .cell{display:block;color:inherit}
+  .cell:active{background:var(--fill)}
+  .row{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 16px}
+  .cell:not(:last-child) .row{border-bottom:.5px solid var(--sep-soft)}
+  .thumb{flex:0 0 auto;width:46px;height:46px;border-radius:9px;object-fit:cover;background:var(--fill)}
+  .row-main{flex:1;min-width:0}
+  .row-title{font-size:16px;font-weight:600;color:var(--label);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row-sub{font-size:13px;color:var(--label2);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row-trail{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+  .price{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--label)}
+  .chev{color:var(--chev);font-size:20px;font-weight:600;line-height:1;margin-top:-2px}
+
+  .cards{display:flex;flex-direction:column;gap:14px}
+  .ccard{background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:0 0 0 .5px var(--sep-soft)}
+  .chead{display:flex;align-items:flex-start;gap:12px}
+  .cthumb{flex:0 0 auto;width:48px;height:48px;border-radius:10px;object-fit:cover;background:var(--fill)}
+  .chead .ctext{flex:1;min-width:0}
+  .ctitle{font-size:17px;font-weight:700;color:var(--label);line-height:1.25}
+  .cvendor{font-size:13px;color:var(--label2);margin-top:2px}
+  .badge{flex:0 0 auto;font:600 11px var(--sys);padding:3px 9px;border-radius:999px;letter-spacing:.02em}
+  .badge.bar{background:var(--tint);color:var(--teal)}
+  .badge.nm{background:#f3ece1;color:var(--amber)}
+  .cstores{margin-top:12px;border-top:.5px solid var(--sep-soft)}
+  .srow{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:.5px solid var(--sep-soft)}
+  .srow:last-child{border-bottom:0}
+  .srow.low{margin:6px -10px 0;padding:9px 10px;background:var(--tint);border-radius:9px;border-bottom:0}
+  .sname{font-size:15px;color:var(--label);display:flex;align-items:center;gap:8px}
+  .srow.low .sname{font-weight:700;color:var(--teal)}
+  .lowtag{font:700 10px var(--sys);background:var(--teal);color:#fff;padding:2px 7px;border-radius:999px;letter-spacing:.04em;text-transform:uppercase}
+  .sprice{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+  .srow.low .sprice{color:var(--teal)}
+  .cfoot{margin-top:10px;font-size:13px;color:var(--label2);font-variant-numeric:tabular-nums}
+  .cfoot b{color:var(--label);font-weight:600}
+  .save{color:var(--teal);font-weight:700}
+
+  .state{padding:64px 24px;text-align:center;color:var(--label2)}
+  .state h2{font-size:20px;font-weight:700;color:var(--label);margin:0 0 6px}
+  .state code{background:var(--fill);padding:2px 6px;border-radius:5px;color:var(--label)}
+  .spinner{width:28px;height:28px;border:3px solid var(--fill-strong);border-top-color:var(--teal);
+           border-radius:50%;margin:0 auto 14px;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  #sentinel{height:1px}
+  .empty{padding:60px 20px;text-align:center;color:var(--label2);font-size:16px}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  @media (min-width:520px){ .title{font-size:34px} }
+</style>
+</head>
+<body>
+<div class="nav">
+  <div class="wrap">
+    <div class="title">Golf Prices</div>
+    <div class="seg" role="group" aria-label="View">
+      <button id="btnCompare" aria-pressed="true">Compare</button>
+      <button id="btnDeals" aria-pressed="false">Deals</button>
+      <button id="btnBrowse" aria-pressed="false">Browse</button>
+    </div>
+    <div class="search"><input id="search" type="search" placeholder="Search" autocomplete="off" autocorrect="off" autocapitalize="none" aria-label="Search"></div>
+    <div class="chips" id="chips"></div>
+  </div>
+</div>
+
+<div class="bar">
+  <span class="count" id="count"></span>
+  <span class="ctrls">
+    <span class="sort" id="matchWrap" hidden><label for="matchSel">Match</label>
+      <select id="matchSel" aria-label="Match type">
+        <option value="all">All</option>
+        <option value="Barcode">Barcode</option>
+        <option value="Name">Name</option>
+      </select>
+    </span>
+    <span class="sort"><label for="sortSel">Sort</label>
+      <select id="sortSel" aria-label="Sort by"></select>
+    </span>
+  </span>
+</div>
+
+<main>
+  <div id="list" class="cards"></div>
+  <div id="empty" class="empty" hidden>No results</div>
+  <div id="sentinel"></div>
+  <div id="loadState" class="state"><div class="spinner"></div>Loading the catalogue</div>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var DATA_URL = "golf_nz_products.xlsx";   // rename here if your workbook name changes
+  var NON_STORE = {"Summary":1,"Price Comparison":1,"All Products":1};
+  var BATCH = 40;
+  var DEAL_MIN = 5;          // a "deal" is at least this percent cheaper than the dearest store
+  var nzd = new Intl.NumberFormat("en-NZ",{style:"currency",currency:"NZD"});
+
+  var S = {
+    sheets:{}, order:[], storeList:[],
+    view:"compare", query:"", stores:{}, sort:"", match:"all",
+    list:[], rendered:0
+  };
+  var $=function(id){return document.getElementById(id);};
+  var esc=function(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");};
+  var escAttr=function(s){return String(s).replace(/"/g,"&quot;");};
+  function numVal(v){
+    if(v===""||v==null) return null;
+    var n=typeof v==="number"?v:parseFloat(String(v).replace(/[^0-9.\-]/g,""));
+    return isNaN(n)?null:n;
+  }
+  function thumbImg(src,cls){
+    if(!src) return "";
+    return '<img class="'+cls+'" src="'+escAttr(src)+'" loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" onerror="this.style.display=\'none\'">';
+  }
+
+  function parseBuffer(buf){
+    var wb=XLSX.read(new Uint8Array(buf),{type:"array"});
+    S.order=wb.SheetNames.slice();
+    wb.SheetNames.forEach(function(name){
+      var grid=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:""});
+      var headers=(grid[0]||[]).map(String);
+      var rows=[];
+      for(var i=1;i<grid.length;i++){
+        var o={}; for(var c=0;c<headers.length;c++){ o[headers[c]]=grid[i][c]===undefined?"":grid[i][c]; }
+        rows.push(o);
+      }
+      S.sheets[name]={headers:headers,rows:rows};
+    });
+    deriveStores();
+    var hasCmp=!!S.sheets["Price Comparison"], hasAll=!!S.sheets["All Products"];
+    $("btnCompare").disabled=!hasCmp; $("btnDeals").disabled=!hasCmp; $("btnBrowse").disabled=!hasAll;
+    $("loadState").remove();
+    setView(hasCmp?"compare":"browse");
+  }
+  function deriveStores(){
+    var seen={},list=[],ap=S.sheets["All Products"];
+    if(ap&&ap.headers.indexOf("Store")!==-1){
+      ap.rows.forEach(function(r){var s=r.Store; if(s&&!seen[s]){seen[s]=1;list.push(s);} });
+    } else { S.order.forEach(function(n){ if(!NON_STORE[n]) list.push(n); }); }
+    list.sort(); S.storeList=list;
+  }
+
+  var SORTS={
+    compare:[["stores","Most stores"],["spreadpct","Biggest gap %"],["spreaddollar","Biggest gap $"],["low","Lowest price"],["name","Name"]],
+    deals:[["spreaddollar","Biggest saving $"],["spreadpct","Biggest saving %"],["stores","Most stores"],["low","Lowest price"],["name","Name"]],
+    browse:[["name","Name"],["pricelow","Price low to high"],["pricehigh","Price high to low"],["store","Store"]]
+  };
+  function buildSort(){
+    var sel=$("sortSel"); sel.innerHTML="";
+    SORTS[S.view].forEach(function(o){var op=document.createElement("option");op.value=o[0];op.textContent=o[1];sel.appendChild(op);});
+    S.sort=SORTS[S.view][0][0]; sel.value=S.sort;
+  }
+
+  function buildChips(){
+    var box=$("chips"); box.innerHTML="";
+    S.storeList.forEach(function(s){
+      var b=document.createElement("button");
+      b.className="chip"; b.textContent=s;
+      b.setAttribute("aria-pressed", S.stores[s]?"true":"false");
+      b.addEventListener("click",function(){
+        if(S.stores[s]) delete S.stores[s]; else S.stores[s]=true;
+        b.setAttribute("aria-pressed", S.stores[s]?"true":"false");
+        resetList();
+      });
+      box.appendChild(b);
+    });
+  }
+
+  function matchesQuery(r,headers,q){
+    for(var i=0;i<headers.length;i++){var v=r[headers[i]]; if(v!==""&&v!=null&&String(v).toLowerCase().indexOf(q)!==-1) return true;}
+    return false;
+  }
+  function matchesStores(r){
+    var sel=Object.keys(S.stores); if(!sel.length) return true;
+    if(S.view==="browse") return S.stores[r.Store]===true;
+    for(var i=0;i<sel.length;i++){ if(r[sel[i]]!==""&&r[sel[i]]!=null&&numVal(r[sel[i]])!=null) return true; }
+    return false;
+  }
+  function compute(){
+    var sheet=S.sheets[S.view==="browse"?"All Products":"Price Comparison"];
+    var headers=sheet.headers, q=S.query.trim().toLowerCase();
+    var out=sheet.rows.filter(function(r){
+      if(S.view==="deals"){ var sp=numVal(r["Spread %"]); if(sp==null||sp<DEAL_MIN) return false; }
+      if(S.view!=="browse" && S.match!=="all" && String(r["Match Type"])!==S.match) return false;
+      if(q&&!matchesQuery(r,headers,q)) return false;
+      if(!matchesStores(r)) return false;
+      return true;
+    });
+    var k=S.sort;
+    var byNum=function(f,d){return function(a,b){var an=numVal(a[f]),bn=numVal(b[f]);
+      if(an==null&&bn==null)return 0; if(an==null)return 1; if(bn==null)return -1; return (an-bn)*d;};};
+    var byStr=function(f){return function(a,b){var av=String(a[f]||"").toLowerCase(),bv=String(b[f]||"").toLowerCase();return av<bv?-1:av>bv?1:0;};};
+    if(k==="name") out.sort(byStr(S.view==="browse"?"Product Name":"Product"));
+    else if(k==="store") out.sort(byStr("Store"));
+    else if(k==="pricelow") out.sort(byNum("Price (NZD)",1));
+    else if(k==="pricehigh") out.sort(byNum("Price (NZD)",-1));
+    else if(k==="stores") out.sort(byNum("# Stores",-1));
+    else if(k==="spreadpct") out.sort(byNum("Spread %",-1));
+    else if(k==="spreaddollar") out.sort(byNum("Spread $",-1));
+    else if(k==="low") out.sort(byNum("Min Price",1));
+    return out;
+  }
+
+  function rowProduct(r){
+    var url=r["Product URL"], name=r["Product Name"]||"";
+    var sub=[r["Store"],r["Vendor"],r["Variant"]].filter(Boolean).join("  \u00b7  ");
+    var p=numVal(r["Price (NZD)"]);
+    var inner='<div class="row">'+thumbImg(r["Image"],"thumb")+
+      '<div class="row-main"><div class="row-title">'+esc(name)+'</div>'+
+      (sub?'<div class="row-sub">'+esc(sub)+'</div>':'')+'</div>'+
+      '<div class="row-trail"><span class="price">'+(p==null?"":nzd.format(p))+'</span>'+
+      (url?'<span class="chev">\u203a</span>':'')+'</div></div>';
+    return url?'<a class="cell" href="'+escAttr(url)+'" target="_blank" rel="noopener">'+inner+'</a>'
+              :'<div class="cell">'+inner+'</div>';
+  }
+  function cardCompare(r){
+    var cheap={}; String(r["Cheapest Store"]||"").split(",").forEach(function(s){cheap[s.trim()]=1;});
+    var lines=S.storeList.map(function(s){return {s:s,p:numVal(r[s])};})
+                .filter(function(x){return x.p!=null;}).sort(function(a,b){return a.p-b.p;});
+    var srows=lines.map(function(l){
+      var low=cheap[l.s];
+      return '<div class="srow'+(low?" low":"")+'"><span class="sname">'+esc(l.s)+
+        (low?' <span class="lowtag">Lowest</span>':'')+'</span><span class="sprice">'+nzd.format(l.p)+'</span></div>';
+    }).join("");
+    var mn=numVal(r["Min Price"]),mx=numVal(r["Max Price"]),pct=numVal(r["Spread %"]);
+    var save=(mn!=null&&mx!=null)?'<span class="save">save '+nzd.format(mx-mn)+(pct!=null?" ("+pct.toFixed(0)+"%)":"")+'</span>':'';
+    var foot=(mn!=null&&mx!=null)?'<div class="cfoot"><b>'+nzd.format(mn)+'</b> to <b>'+nzd.format(mx)+
+      '</b> across '+lines.length+' stores  \u00b7  '+save+'</div>':'';
+    var mt=r["Match Type"]||"";
+    var badge='<span class="badge '+(mt==="Barcode"?"bar":"nm")+'">'+esc(mt)+'</span>';
+    return '<div class="ccard"><div class="chead">'+thumbImg(r["Image"],"cthumb")+
+      '<div class="ctext"><div class="ctitle">'+esc(r["Product"]||"")+'</div>'+
+      (r["Vendor"]?'<div class="cvendor">'+esc(r["Vendor"])+'</div>':'')+'</div>'+(mt?badge:"")+
+      '</div><div class="cstores">'+srows+'</div>'+foot+'</div>';
+  }
+
+  function appendBatch(){
+    var list=$("list"), end=Math.min(S.rendered+BATCH,S.list.length), html="";
+    var render=S.view==="browse"?rowProduct:cardCompare;
+    for(var i=S.rendered;i<end;i++) html+=render(S.list[i]);
+    if(html) list.insertAdjacentHTML("beforeend",html);
+    S.rendered=end;
+  }
+  function resetList(){
+    S.list=compute(); S.rendered=0;
+    var list=$("list");
+    list.className=(S.view==="browse")?"list":"cards";
+    list.innerHTML="";
+    $("empty").hidden=S.list.length>0;
+    var noun=S.view==="deals"?" deals":S.view==="browse"?" products":" matches";
+    $("count").textContent=S.list.length.toLocaleString()+noun;
+    appendBatch(); fillViewport();
+  }
+  function fillViewport(){
+    var guard=0;
+    while(S.rendered<S.list.length && guard<60){
+      var rect=$("sentinel").getBoundingClientRect();
+      if(rect.top>window.innerHeight+200) break;
+      appendBatch(); guard++;
+    }
+  }
+
+  function setView(v){
+    S.view=v; S.query=""; $("search").value=""; S.stores={};
+    S.match="all"; if($("matchSel")) $("matchSel").value="all";
+    $("matchWrap").hidden=(v==="browse");
+    $("btnCompare").setAttribute("aria-pressed",v==="compare"?"true":"false");
+    $("btnDeals").setAttribute("aria-pressed",v==="deals"?"true":"false");
+    $("btnBrowse").setAttribute("aria-pressed",v==="browse"?"true":"false");
+    buildSort(); buildChips(); resetList();
+    window.scrollTo(0,0);
+  }
+
+  var t;
+  $("search").addEventListener("input",function(e){clearTimeout(t);t=setTimeout(function(){S.query=e.target.value;resetList();},130);});
+  $("sortSel").addEventListener("change",function(e){S.sort=e.target.value;resetList();});
+  $("matchSel").addEventListener("change",function(e){S.match=e.target.value;resetList();});
+  $("btnCompare").addEventListener("click",function(){if(!this.disabled)setView("compare");});
+  $("btnDeals").addEventListener("click",function(){if(!this.disabled)setView("deals");});
+  $("btnBrowse").addEventListener("click",function(){if(!this.disabled)setView("browse");});
+
+  if("IntersectionObserver" in window){
+    new IntersectionObserver(function(entries){
+      if(entries[0].isIntersecting && S.rendered<S.list.length){ appendBatch(); fillViewport(); }
+    },{rootMargin:"400px"}).observe($("sentinel"));
+  } else {
+    window.addEventListener("scroll",function(){
+      if(S.rendered<S.list.length && window.innerHeight+window.scrollY>document.body.offsetHeight-500){appendBatch();}
+    });
+  }
+
+  function showError(msg){
+    var el=$("loadState"); if(!el){el=document.createElement("div");el.className="state";document.querySelector("main").appendChild(el);}
+    el.className="state";
+    el.innerHTML='<h2>Could not load the catalogue</h2><p>'+msg+'</p>'+
+      '<p>Make sure <code>'+DATA_URL+'</code> is committed next to this page in the same GitHub Pages site.</p>';
+  }
+  fetch(DATA_URL)
+    .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.arrayBuffer();})
+    .then(parseBuffer)
+    .catch(function(err){showError("The page could not fetch it ("+err.message+").");});
+})();
+</script>
+</body>
+</html>
