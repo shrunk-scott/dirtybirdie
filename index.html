@@ -1,1 +1,499 @@
-hello world
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NZ Golf Price Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --navy:#1F3A5F; --blue:#1B4F8A; --teal:#2A9D8F; --teal-deep:#0D7F7F;
+    --ink:#1c2530; --muted:#5b6775; --line:#e2e6ec; --paper:#f7f8fa;
+    --paper-2:#eef1f5; --white:#ffffff; --amber:#c77d33; --teal-tint:#e7f4f1;
+    --sans:"Calibri","Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;
+    --serif:Georgia,"Times New Roman",serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:var(--sans);color:var(--ink);background:var(--paper);font-size:15px;line-height:1.45}
+  a{color:var(--blue);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  header.app{
+    background:var(--navy);color:#fff;padding:18px 22px;
+    display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;
+    border-bottom:3px solid var(--teal);
+  }
+  header.app h1{font-family:var(--serif);font-weight:600;font-size:22px;margin:0;letter-spacing:.2px}
+  header.app .stat{font-size:13px;color:#cdd8e6}
+  header.app .stat b{color:#fff;font-weight:600}
+  header.app .spacer{flex:1}
+
+  .controls{
+    position:sticky;top:0;z-index:5;background:var(--white);
+    border-bottom:1px solid var(--line);padding:12px 22px;
+    display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+  }
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{
+    appearance:none;border:0;background:var(--white);color:var(--muted);
+    font:600 13px/1 var(--sans);padding:9px 14px;cursor:pointer;border-right:1px solid var(--line);
+  }
+  .seg button:last-child{border-right:0}
+  .seg button[aria-pressed="true"]{background:var(--navy);color:#fff}
+  .seg button:focus-visible{outline:2px solid var(--teal);outline-offset:-2px}
+
+  .search{flex:1;min-width:220px;position:relative}
+  .search input{
+    width:100%;padding:10px 12px 10px 34px;border:1px solid var(--line);border-radius:8px;
+    font:15px var(--sans);color:var(--ink);background:var(--paper) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235b6775' stroke-width='2'><circle cx='11' cy='11' r='7'/><path d='M21 21l-4.3-4.3'/></svg>") no-repeat 10px center;
+  }
+  .search input:focus{outline:0;border-color:var(--teal);background-color:#fff}
+
+  select,.pagesize select{font:14px var(--sans);padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+  select:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
+
+  .filters{padding:0 22px;border-bottom:1px solid var(--line);background:var(--white)}
+  .filters .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0}
+  .filters .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-right:4px}
+  .chip{
+    appearance:none;border:1px solid var(--line);background:#fff;color:var(--muted);
+    border-radius:999px;padding:6px 12px;font:600 12px var(--sans);cursor:pointer;
+  }
+  .chip[aria-pressed="true"]{background:var(--teal-tint);border-color:var(--teal);color:var(--teal-deep)}
+  .chip:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
+
+  .meta{padding:10px 22px;color:var(--muted);font-size:13px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .meta .clear{background:none;border:0;color:var(--blue);font:13px var(--sans);cursor:pointer;padding:0}
+  .meta .clear:hover{text-decoration:underline}
+
+  .table-wrap{overflow:auto;border-top:1px solid var(--line)}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  thead th{
+    position:sticky;top:0;background:var(--paper-2);color:var(--navy);
+    text-align:left;font-weight:600;padding:10px 12px;white-space:nowrap;
+    border-bottom:1px solid var(--line);cursor:pointer;user-select:none;
+  }
+  thead th .arrow{color:var(--teal-deep);font-size:11px;margin-left:4px}
+  tbody td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:nth-child(even){background:#fcfdfe}
+  tbody tr:hover{background:var(--teal-tint)}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td.cheapest{background:var(--teal-tint);color:var(--teal-deep);font-weight:700}
+  td.clip{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  td.name{max-width:340px;font-weight:600;color:var(--ink)}
+  .badge{display:inline-block;font:600 11px var(--sans);padding:2px 8px;border-radius:999px;background:var(--paper-2);color:var(--muted)}
+  .badge.bar{background:#e8eef7;color:var(--blue)}
+  .badge.name{background:#f1ece4;color:var(--amber)}
+  .spread{font-variant-numeric:tabular-nums;font-weight:700}
+
+  footer.pager{display:flex;gap:14px;align-items:center;justify-content:flex-end;padding:14px 22px;flex-wrap:wrap}
+  footer.pager button{
+    appearance:none;border:1px solid var(--line);background:#fff;color:var(--navy);
+    font:600 13px var(--sans);padding:8px 14px;border-radius:8px;cursor:pointer;
+  }
+  footer.pager button:disabled{color:#b6bfca;cursor:default}
+  footer.pager button:not(:disabled):hover{border-color:var(--teal);color:var(--teal-deep)}
+  footer.pager .page{font-size:13px;color:var(--muted)}
+  footer.pager input{width:64px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;font:13px var(--sans);text-align:center}
+
+  .state{padding:60px 22px;text-align:center;color:var(--muted)}
+  .state h2{font-family:var(--serif);color:var(--navy);font-weight:600;margin:0 0 8px}
+  .state code{background:var(--paper-2);padding:2px 6px;border-radius:4px;color:var(--ink)}
+  .drop{margin-top:18px}
+  .drop label{display:inline-block;border:1px dashed var(--teal);color:var(--teal-deep);background:var(--teal-tint);
+    padding:12px 18px;border-radius:10px;cursor:pointer;font-weight:600}
+  .drop input{display:none}
+
+  @media (max-width:640px){
+    header.app,.controls,.filters,.meta,footer.pager{padding-left:14px;padding-right:14px}
+    td.clip,td.name{max-width:180px}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="app">
+  <h1>NZ Golf Price Explorer</h1>
+  <span class="spacer"></span>
+  <span class="stat" id="headStat"></span>
+</header>
+
+<div class="controls">
+  <div class="seg" role="group" aria-label="View">
+    <button id="btnCompare" aria-pressed="true">Compare prices</button>
+    <button id="btnBrowse" aria-pressed="false">Browse all</button>
+  </div>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search product, brand, SKU, store" autocomplete="off" aria-label="Search">
+  </div>
+  <select id="sheetSelect" aria-label="Sheet"></select>
+</div>
+
+<div class="filters" id="filters" hidden>
+  <div class="row" id="storeChips"><span class="lbl">Stores</span></div>
+</div>
+
+<div class="meta" id="meta"></div>
+
+<div id="content">
+  <div class="state" id="loadState">
+    <h2>Loading the catalogue</h2>
+    <p>Reading <code id="fileNameLabel">golf_nz_products.xlsx</code></p>
+  </div>
+</div>
+
+<footer class="pager" id="pager" hidden>
+  <span class="pagesize">Rows
+    <select id="pageSize">
+      <option>25</option><option selected>50</option><option>100</option><option>250</option>
+    </select>
+  </span>
+  <button id="firstBtn" title="First">&laquo;</button>
+  <button id="prevBtn">Prev</button>
+  <span class="page" id="pageInfo"></span>
+  <button id="nextBtn">Next</button>
+  <button id="lastBtn" title="Last">&raquo;</button>
+  <span class="page">Go to <input id="pageJump" type="number" min="1" value="1"></span>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // Change this if you rename the workbook in your repo.
+  var DATA_URL = "golf_nz_products.xlsx";
+
+  var NON_STORE_SHEETS = {"Summary":1, "Price Comparison":1, "All Products":1};
+  var MONEY_HEADERS = {"Price (NZD)":1, "Compare At Price":1, "Min Price":1, "Max Price":1, "Spread $":1};
+
+  var nzd = new Intl.NumberFormat("en-NZ", {style:"currency", currency:"NZD"});
+
+  var state = {
+    sheets:{},        // name -> {headers:[], rows:[]}
+    order:[],         // sheet names in workbook order
+    storeList:[],     // distinct store names
+    current:"",       // active sheet name
+    query:"",
+    stores:{},        // selected store filter (set of names)
+    sortCol:null, sortDir:1,
+    page:1, pageSize:50,
+    view:""           // "compare" | "browse" | "other"
+  };
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  // ---------- load ----------
+  function parseBuffer(buf){
+    var wb = XLSX.read(new Uint8Array(buf), {type:"array"});
+    state.order = wb.SheetNames.slice();
+    wb.SheetNames.forEach(function(name){
+      var ws = wb.Sheets[name];
+      var grid = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+      var headers = (grid[0] || []).map(function(h){ return String(h); });
+      var rows = [];
+      for(var i=1;i<grid.length;i++){
+        var r = grid[i], obj = {};
+        for(var c=0;c<headers.length;c++){ obj[headers[c]] = r[c] === undefined ? "" : r[c]; }
+        rows.push(obj);
+      }
+      state.sheets[name] = {headers:headers, rows:rows};
+    });
+    deriveStores();
+    buildSheetSelect();
+    headerStats();
+    // Default to the comparison view if present.
+    if(state.sheets["Price Comparison"]) setSheet("Price Comparison");
+    else if(state.sheets["All Products"]) setSheet("All Products");
+    else setSheet(state.order[0]);
+  }
+
+  function deriveStores(){
+    var seen = {}, list = [];
+    var ap = state.sheets["All Products"];
+    if(ap && ap.headers.indexOf("Store") !== -1){
+      ap.rows.forEach(function(r){ var s=r.Store; if(s && !seen[s]){seen[s]=1; list.push(s);} });
+    } else {
+      state.order.forEach(function(n){ if(!NON_STORE_SHEETS[n]){ list.push(n); } });
+    }
+    list.sort();
+    state.storeList = list;
+  }
+
+  function buildSheetSelect(){
+    var sel = $("sheetSelect");
+    sel.innerHTML = "";
+    state.order.forEach(function(n){
+      var o = document.createElement("option");
+      o.value = n; o.textContent = n;
+      sel.appendChild(o);
+    });
+  }
+
+  function headerStats(){
+    var ap = state.sheets["All Products"];
+    var cmp = state.sheets["Price Comparison"];
+    var bits = [];
+    if(ap) bits.push("<b>"+ap.rows.length.toLocaleString()+"</b> listings");
+    if(state.storeList.length) bits.push("<b>"+state.storeList.length+"</b> stores");
+    if(cmp) bits.push("<b>"+cmp.rows.length.toLocaleString()+"</b> matched across stores");
+    $("headStat").innerHTML = bits.join(" &nbsp;&middot;&nbsp; ");
+  }
+
+  // ---------- column typing ----------
+  function isStoreCol(h){ return state.storeList.indexOf(h) !== -1; }
+  function isMoney(h){ return MONEY_HEADERS[h] === 1 || isStoreCol(h); }
+  function isPercent(h){ return h === "Spread %"; }
+  function isUrl(h){ return /url/i.test(h); }
+  function isCount(h){ return h === "# Stores"; }
+  function isLong(h){ return h === "Description"; }
+
+  function numVal(v){
+    if(v === "" || v === null || v === undefined) return null;
+    var n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.\-]/g,""));
+    return isNaN(n) ? null : n;
+  }
+
+  // ---------- filtering / sorting ----------
+  function rowMatchesQuery(row, headers, q){
+    for(var i=0;i<headers.length;i++){
+      var v = row[headers[i]];
+      if(v !== "" && v !== null && String(v).toLowerCase().indexOf(q) !== -1) return true;
+    }
+    return false;
+  }
+
+  function rowMatchesStores(row){
+    var sel = Object.keys(state.stores);
+    if(sel.length === 0) return true;
+    if(state.view === "browse" && row.Store !== undefined){
+      return state.stores[row.Store] === true;
+    }
+    // Comparison view: keep rows that the selected store actually prices.
+    for(var i=0;i<sel.length;i++){ if(row[sel[i]] !== "" && row[sel[i]] !== undefined) return true; }
+    return false;
+  }
+
+  function currentRows(){
+    var sheet = state.sheets[state.current];
+    var headers = sheet.headers;
+    var q = state.query.trim().toLowerCase();
+    var out = sheet.rows.filter(function(r){
+      if(q && !rowMatchesQuery(r, headers, q)) return false;
+      if(!rowMatchesStores(r)) return false;
+      return true;
+    });
+    if(state.sortCol !== null){
+      var h = state.sortCol, dir = state.sortDir, money = isMoney(h)||isPercent(h)||isCount(h);
+      out = out.slice().sort(function(a,b){
+        var av=a[h], bv=b[h];
+        if(money){
+          var an=numVal(av), bn=numVal(bv);
+          if(an===null && bn===null) return 0;
+          if(an===null) return 1; if(bn===null) return -1;
+          return (an-bn)*dir;
+        }
+        av=String(av).toLowerCase(); bv=String(bv).toLowerCase();
+        return av<bv ? -dir : av>bv ? dir : 0;
+      });
+    }
+    return out;
+  }
+
+  // ---------- render ----------
+  function fmtCell(h, v, cheapestSet){
+    if(v === "" || v === null || v === undefined) return {cls:"", html:""};
+    if(isUrl(h)){
+      var safe = String(v).replace(/"/g,"&quot;");
+      return {cls:"", html:'<a href="'+safe+'" target="_blank" rel="noopener">open</a>'};
+    }
+    if(isMoney(h)){
+      var n = numVal(v);
+      var cls = "num" + (cheapestSet && cheapestSet[h] ? " cheapest" : "");
+      return {cls:cls, html: n===null ? "" : nzd.format(n)};
+    }
+    if(isPercent(h)){
+      var p = numVal(v);
+      return {cls:"num", html: p===null ? "" : '<span class="spread">'+p.toFixed(1)+'%</span>'};
+    }
+    if(isCount(h)){ return {cls:"num", html:String(v)}; }
+    if(h === "Match Type"){
+      var t = String(v);
+      var b = t === "Barcode" ? "badge bar" : "badge name";
+      return {cls:"", html:'<span class="'+b+'">'+t+'</span>'};
+    }
+    if(h === "Product" || h === "Product Name"){
+      return {cls:"name", html: escapeHtml(String(v))};
+    }
+    if(isLong(h)){ return {cls:"clip", html: escapeHtml(String(v))}; }
+    return {cls:"", html: escapeHtml(String(v))};
+  }
+
+  function escapeHtml(s){
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function render(){
+    var sheet = state.sheets[state.current];
+    if(!sheet) return;
+    var headers = sheet.headers;
+    var rows = currentRows();
+
+    var total = rows.length;
+    var pages = Math.max(1, Math.ceil(total / state.pageSize));
+    if(state.page > pages) state.page = pages;
+    var start = (state.page - 1) * state.pageSize;
+    var slice = rows.slice(start, start + state.pageSize);
+
+    // header
+    var thead = "<tr>";
+    for(var i=0;i<headers.length;i++){
+      var h = headers[i];
+      var arrow = state.sortCol === h ? '<span class="arrow">'+(state.sortDir>0?"\u25B2":"\u25BC")+"</span>" : "";
+      thead += '<th data-col="'+escapeHtml(h)+'" title="Sort by '+escapeHtml(h)+'">'+escapeHtml(h)+arrow+"</th>";
+    }
+    thead += "</tr>";
+
+    // body
+    var hasCheapest = headers.indexOf("Cheapest Store") !== -1;
+    var body = [];
+    for(var r=0;r<slice.length;r++){
+      var row = slice[r];
+      var cheapestSet = null;
+      if(hasCheapest && row["Cheapest Store"]){
+        cheapestSet = {};
+        String(row["Cheapest Store"]).split(",").forEach(function(s){ cheapestSet[s.trim()] = true; });
+      }
+      var tds = [];
+      for(var c=0;c<headers.length;c++){
+        var cell = fmtCell(headers[c], row[headers[c]], cheapestSet);
+        var title = (isLong(headers[c]) && row[headers[c]]) ? ' title="'+escapeHtml(String(row[headers[c]])).replace(/"/g,"&quot;")+'"' : "";
+        tds.push('<td class="'+cell.cls+'"'+title+">"+cell.html+"</td>");
+      }
+      body.push("<tr>"+tds.join("")+"</tr>");
+    }
+
+    var html = '<div class="table-wrap"><table><thead>'+thead+"</thead><tbody>"+
+               (slice.length ? body.join("") : '<tr><td colspan="'+headers.length+'" style="padding:40px;text-align:center;color:#5b6775">No products match your search. Try fewer words or clear the store filters.</td></tr>')+
+               "</tbody></table></div>";
+    $("content").innerHTML = html;
+
+    // wire header sorting
+    var ths = $("content").querySelectorAll("th");
+    Array.prototype.forEach.call(ths, function(th){
+      th.addEventListener("click", function(){
+        var col = th.getAttribute("data-col");
+        if(state.sortCol === col){ state.sortDir = -state.sortDir; }
+        else { state.sortCol = col; state.sortDir = 1; }
+        render();
+      });
+    });
+
+    // meta + pager
+    var shown = slice.length ? (start+1) : 0;
+    var end = start + slice.length;
+    var metaBits = ['Showing <b>'+shown.toLocaleString()+"\u2013"+end.toLocaleString()+"</b> of <b>"+total.toLocaleString()+"</b>"];
+    if(state.query || Object.keys(state.stores).length){
+      metaBits.push('<button class="clear" id="clearBtn">Clear filters</button>');
+    }
+    $("meta").innerHTML = metaBits.join(" &nbsp;&middot;&nbsp; ");
+    var cb = $("clearBtn");
+    if(cb) cb.addEventListener("click", function(){
+      state.query=""; state.stores={}; $("search").value=""; state.page=1;
+      renderStoreChips(); render();
+    });
+
+    $("pager").hidden = false;
+    $("pageInfo").textContent = "Page "+state.page+" of "+pages;
+    $("firstBtn").disabled = state.page<=1;
+    $("prevBtn").disabled = state.page<=1;
+    $("nextBtn").disabled = state.page>=pages;
+    $("lastBtn").disabled = state.page>=pages;
+    $("pageJump").max = pages;
+    $("pageJump").value = state.page;
+  }
+
+  // ---------- store chips ----------
+  function renderStoreChips(){
+    var box = $("storeChips");
+    box.innerHTML = '<span class="lbl">Stores</span>';
+    state.storeList.forEach(function(s){
+      var b = document.createElement("button");
+      b.className = "chip"; b.textContent = s;
+      b.setAttribute("aria-pressed", state.stores[s] ? "true" : "false");
+      b.addEventListener("click", function(){
+        if(state.stores[s]) delete state.stores[s]; else state.stores[s] = true;
+        b.setAttribute("aria-pressed", state.stores[s] ? "true" : "false");
+        state.page = 1; render();
+      });
+      box.appendChild(b);
+    });
+  }
+
+  // ---------- view + sheet switching ----------
+  function setSheet(name){
+    state.current = name;
+    state.sortCol = null; state.sortDir = 1; state.page = 1;
+    $("sheetSelect").value = name;
+    if(name === "Price Comparison") state.view = "compare";
+    else if(name === "All Products") state.view = "browse";
+    else state.view = "other";
+    $("btnCompare").setAttribute("aria-pressed", state.view==="compare" ? "true":"false");
+    $("btnBrowse").setAttribute("aria-pressed", state.view==="browse" ? "true":"false");
+    // Store chips help on Browse and Compare; hide on per-store sheets.
+    var showChips = (state.view !== "other") && state.storeList.length > 0;
+    $("filters").hidden = !showChips;
+    if(showChips) renderStoreChips();
+    render();
+  }
+
+  // ---------- events ----------
+  var t;
+  $("search").addEventListener("input", function(e){
+    clearTimeout(t);
+    t = setTimeout(function(){ state.query = e.target.value; state.page = 1; render(); }, 130);
+  });
+  $("sheetSelect").addEventListener("change", function(e){ state.stores={}; setSheet(e.target.value); });
+  $("btnCompare").addEventListener("click", function(){ if(state.sheets["Price Comparison"]){ state.stores={}; setSheet("Price Comparison"); } });
+  $("btnBrowse").addEventListener("click", function(){ if(state.sheets["All Products"]){ state.stores={}; setSheet("All Products"); } });
+  $("pageSize").addEventListener("change", function(e){ state.pageSize = parseInt(e.target.value,10); state.page=1; render(); });
+  $("firstBtn").addEventListener("click", function(){ state.page=1; render(); });
+  $("prevBtn").addEventListener("click", function(){ if(state.page>1){state.page--; render();} });
+  $("nextBtn").addEventListener("click", function(){ state.page++; render(); });
+  $("lastBtn").addEventListener("click", function(){ state.page=1e9; render(); });
+  $("pageJump").addEventListener("change", function(e){ var p=parseInt(e.target.value,10); if(p>0){ state.page=p; render(); } });
+
+  // ---------- error / file fallback ----------
+  function showError(msg){
+    $("content").innerHTML =
+      '<div class="state"><h2>Could not load the catalogue</h2>'+
+      '<p>'+msg+'</p>'+
+      '<p>Make sure <code>'+DATA_URL+'</code> sits in the same folder as this page on GitHub Pages, '+
+      'or load it manually below.</p>'+
+      '<div class="drop"><label>Choose workbook<input id="filePick" type="file" accept=".xlsx"></label></div></div>';
+    wireFilePick();
+  }
+  function wireFilePick(){
+    var fp = $("filePick");
+    if(!fp) return;
+    fp.addEventListener("change", function(e){
+      var f = e.target.files[0]; if(!f) return;
+      var fr = new FileReader();
+      fr.onload = function(){ try{ parseBuffer(fr.result); }catch(err){ showError("That file could not be read as an .xlsx workbook."); } };
+      fr.readAsArrayBuffer(f);
+    });
+  }
+
+  // ---------- go ----------
+  $("fileNameLabel").textContent = DATA_URL;
+  fetch(DATA_URL)
+    .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.arrayBuffer(); })
+    .then(function(buf){ parseBuffer(buf); })
+    .catch(function(err){
+      showError("The page tried to fetch it automatically but failed ("+err.message+"). "+
+                "This is expected if you opened the file directly from your computer rather than over a web server.");
+    });
+})();
+</script>
+</body>
+</html>
